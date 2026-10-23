@@ -8,15 +8,19 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "false"
+    # fixed key: keeps login sessions valid across restarts and lets the webserver read task logs
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-02739452-books-pipeline-dev-key}
     AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: "15"
     BOOKS_DB_URL: postgresql://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres:5432/books
     BOOKS_DATA_DIR: /opt/airflow/data
     TZ: Asia/Bangkok
     ENABLED_SOURCES: ${ENABLED_SOURCES:-seed,b2s,amarin}
     SOURCE_SEED_URLS: ${SOURCE_SEED_URLS:-}
+    SOURCE_BOOKCAZE_URLS: ${SOURCE_BOOKCAZE_URLS:-}
     SOURCE_B2S_URLS: ${SOURCE_B2S_URLS:-}
     SOURCE_AMARIN_URLS: ${SOURCE_AMARIN_URLS:-}
     SOURCE_NAIIN_URLS: ${SOURCE_NAIIN_URLS:-}
+    B2S_API_TOKEN: ${B2S_API_TOKEN:-}
     MIN_VALID_RATIO: ${MIN_VALID_RATIO:-0.8}
     MIN_TOTAL_ROWS: ${MIN_TOTAL_ROWS:-1}
   volumes:
@@ -35,7 +39,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-airflow}
       POSTGRES_DB: airflow
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5433}:5432"   # 5433 on the host avoids clashing with a locally installed PostgreSQL
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./initdb:/docker-entrypoint-initdb.d:ro
@@ -52,7 +56,8 @@ services:
       - |
         airflow db migrate &&
         airflow users create --username "${AIRFLOW_ADMIN_USER:-admin}" --password "${AIRFLOW_ADMIN_PASSWORD:-admin}" \
-          --firstname Admin --lastname User --role Admin --email admin@example.com || true
+          --firstname Admin --lastname User --role Admin --email admin@example.com ;
+        airflow users reset-password --username "${AIRFLOW_ADMIN_USER:-admin}" --password "${AIRFLOW_ADMIN_PASSWORD:-admin}"
     restart: "no"
 
   airflow-webserver:

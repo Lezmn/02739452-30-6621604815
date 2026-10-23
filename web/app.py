@@ -6,7 +6,7 @@ import psycopg2.extras
 from flask import Flask, render_template, request
 
 DB_URL = os.getenv("BOOKS_DB_URL", "postgresql://airflow:airflow@localhost:5432/books")
-LABELS = {"seed": "SE-ED", "b2s": "B2S", "amarin": "Amarinbooks", "naiin": "นายอินทร์"}
+LABELS = {"seed": "SE-ED", "bookcaze": "Bookcaze", "b2s": "B2S", "amarin": "Amarinbooks", "naiin": "นายอินทร์"}
 
 app = Flask(__name__)
 
@@ -84,14 +84,39 @@ def index():
 
 @app.route("/compare")
 def compare():
-    rows = safe(lambda: q("""
-        SELECT u.*, (u.max_price - u.min_price) AS diff,
-               json_agg(json_build_object('source', b.source, 'price', b.price, 'url', b.url)
-                        ORDER BY b.price) AS offers
+    srcs = safe(lambda: [r["source"] for r in q("SELECT DISTINCT source FROM books ORDER BY 1")], [])
+    term = request.args.get("q", "").strip()
+    # searching by name shows every matching book (even if only 1 shop has it); otherwise only shared books
+    min_shops = request.args.get("n", default=(1 if term else 2), type=int)
+    where, params = ["u.n_sources >= %s"], [min_shops]
+    if term:
+        # match the unified title OR any shop's own title / author
+        where.append("""(u.title ILIKE %s OR EXISTS (SELECT 1 FROM books x WHERE x.dedup_key = u.dedup_key
+                          AND (x.title ILIKE %s OR x.author ILIKE %s)))""")
+        params += [f"%{term}%"] * 3
+    rows = safe(lambda: q(f"""
+        SELECT u.dedup_key, u.title, u.author, u.isbn, u.n_sources, u.min_price, u.max_price,
+               u.cheapest_source, (u.max_price - u.min_price) AS diff,
+               json_object_agg(b.source, json_build_object('price', b.price, 'url', b.url)) AS offers
         FROM books_unified u JOIN books b USING (dedup_key)
-        WHERE u.n_sources > 1
-        GROUP BY u.dedup_key ORDER BY diff DESC, u.title LIMIT 300"""), [])
-    return render_template("compare.html", rows=rows)
+        WHERE {" AND ".join(where)}
+        GROUP BY u.dedup_key ORDER BY diff DESC, u.title LIMIT 500""", params), [])
+    # who is cheapest how often + average price of the same matched books per shop
+    wins = safe(lambda: q("""
+        SELECT cheapest_source AS source, COUNT(*) AS n FROM books_unified
+        WHERE n_sources >= %s GROUP BY 1 ORDER BY 2 DESC""", [min_shops]), [])
+    avg_same = safe(lambda: q("""
+        SELECT b.source, ROUND(AVG(b.price), 0) AS avg_price, COUNT(*) AS n
+        FROM books b JOIN books_unified u USING (dedup_key)
+        WHERE u.n_sources >= %s GROUP BY 1 ORDER BY 1""", [min_shops]), [])
+    summary = safe(lambda: q("""
+        SELECT COUNT(*) FILTER (WHERE n_sources >= 2) AS in2,
+               COUNT(*) FILTER (WHERE n_sources >= 3) AS in3,
+               ROUND(AVG(max_price - min_price) FILTER (WHERE n_sources >= 2), 0) AS avg_save,
+               MAX(max_price - min_price) AS max_save
+        FROM books_unified""")[0], {})
+    return render_template("compare.html", rows=rows, srcs=srcs, wins=wins, avg_same=avg_same,
+                           summary=summary, f={"n": min_shops, "q": term})
 
 
 @app.route("/status")

@@ -6,18 +6,35 @@ SOURCES = {
     "seed": {
         "label": "SE-ED",
         "urls": [
-            "https://www.se-ed.com/%E0%B8%AA%E0%B8%B7%E0%B8%9A%E0%B8%AA%E0%B8%A7%E0%B8%99%E0%B8%AA%E0%B8%AD%E0%B8%9A%E0%B8%AA%E0%B8%A7%E0%B8%99%2F%E0%B8%AA%E0%B8%A2%E0%B8%AD%E0%B8%87%E0%B8%82%E0%B8%A7%E0%B8%B1%E0%B8%8D-cat.book-3hmmpo-lz4zok?page={page}",
+            # Page is rendered by JavaScript; call the public search API it uses (no token needed).
+            # category book-dhijad-t1wg1l = นิยายสืบสวน ซ่อนเงื่อน สยองขวัญ ({skip} = (page-1)*48)
+            "https://mp-api.se-ed.com/web-bff/search-product?filter.categoryId=book-dhijad-t1wg1l&option.limit=48&option.skip={skip}&sorter=PRODUCT_SORTER_NEWEST",
         ],
-        "parser": "auto",
-        "max_pages": 5,
+        "parser": "seed_api",
+        "max_pages": 6,
+    },
+    "bookcaze": {
+        "label": "Bookcaze",
+        "urls": [
+            # OpenCart, server-rendered HTML (verified). Several mystery keywords, 100 per page.
+            "https://www.bookcaze.com/index.php?route=product/search&search=%E0%B8%AA%E0%B8%B7%E0%B8%9A%E0%B8%AA%E0%B8%A7%E0%B8%99&limit=100&page={page}",
+            "https://www.bookcaze.com/index.php?route=product/search&search=%E0%B8%86%E0%B8%B2%E0%B8%95%E0%B8%81%E0%B8%A3%E0%B8%A3%E0%B8%A1&limit=100&page={page}",
+            "https://www.bookcaze.com/index.php?route=product/search&search=%E0%B8%9B%E0%B8%A3%E0%B8%B4%E0%B8%A8%E0%B8%99%E0%B8%B2&limit=100&page={page}",
+            "https://www.bookcaze.com/index.php?route=product/search&search=agatha&limit=100&page={page}",
+            "https://www.bookcaze.com/index.php?route=product/search&search=%E0%B9%80%E0%B8%8A%E0%B8%AD%E0%B8%A3%E0%B9%8C%E0%B8%A5%E0%B9%87%E0%B8%AD%E0%B8%81&limit=100&page={page}",
+        ],
+        "parser": "opencart",
+        "max_pages": 2,
     },
     "b2s": {
         "label": "B2S",
         "urls": [
-            "https://www.b2s.co.th/category/%E0%B8%AB%E0%B8%99%E0%B8%B1%E0%B8%87%E0%B8%AA%E0%B8%B7%E0%B8%AD/%E0%B8%AB%E0%B8%99%E0%B8%B1%E0%B8%87%E0%B8%AA%E0%B8%B7%E0%B8%AD%E0%B8%99%E0%B8%B4%E0%B8%A2%E0%B8%B2%E0%B8%A2-%E0%B8%A7%E0%B8%A3%E0%B8%A3%E0%B8%93%E0%B8%81%E0%B8%A3%E0%B8%A3%E0%B8%A1/%E0%B8%99%E0%B8%B4%E0%B8%A2%E0%B8%B2%E0%B8%A2%E0%B8%AA%E0%B8%B7%E0%B8%9A%E0%B8%AA%E0%B8%A7%E0%B8%99%E0%B8%AA%E0%B8%AD%E0%B8%9A%E0%B8%AA%E0%B8%A7%E0%B8%99?page={page}",
+            # Product list is rendered by JavaScript; we call the same public catalog API the page uses
+            # (guest token in B2S_API_TOKEN). Category 666d...122f = นิยายสืบสวนสอบสวน
+            "https://b2sp-gw.b2s.co.th/b2s/product/api/v1/CatalogProducts?account_channel=standard&user_category_type=Standard&company_id=&default_sort=promotion&page={page}&page_size=30&categories=666d6731e02e2998486e122f&sort=promotion&is_facet_only=false",
         ],
-        "parser": "auto",
-        "max_pages": 5,
+        "parser": "b2s_api",
+        "max_pages": 16,
     },
     "amarin": {
         "label": "Amarinbooks",
@@ -40,7 +57,7 @@ SOURCES = {
     },
 }
 
-ENABLED_SOURCES = [s.strip() for s in os.getenv("ENABLED_SOURCES", "seed,b2s,amarin").split(",") if s.strip()]
+ENABLED_SOURCES = [s.strip() for s in os.getenv("ENABLED_SOURCES", "seed,b2s,amarin,bookcaze").split(",") if s.strip()]
 
 for _name, _cfg in SOURCES.items():
     _env = os.getenv(f"SOURCE_{_name.upper()}_URLS")

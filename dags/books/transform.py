@@ -5,7 +5,7 @@ import re
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
 
-NOISE = ["หนังสือ", "นิยายสืบสวนสอบสวน", "นิยายสืบสวน", "นิยายแปล", "นิยาย", "ฉบับปรับปรุง",
+NOISE = ["(สินค้าสั่งจอง)", "สินค้าสั่งจอง", "pre-order", "preorder", "หนังสือ", "นิยายสืบสวนสอบสวน", "นิยายสืบสวน", "นิยายแปล", "นิยาย", "ฉบับปรับปรุง",
          "ปกใหม่", "พิมพ์ใหม่", "re-newed", "renewed", "new edition", "ปกอ่อน", "ปกแข็ง"]
 PUNCT = re.compile(r"[\s\-–—_:;,.!?\"'“”‘’()\[\]{}<>/\\|#*+=~`@$%^&]+")
 EDITION = re.compile(r"(พิมพ์ครั้งที่\s*\d+|พิมพ์\s*\d+|\(.*?พิมพ์.*?\))", re.I)
@@ -14,6 +14,7 @@ EDITION = re.compile(r"(พิมพ์ครั้งที่\s*\d+|พิม�
 def clean_title(t: str) -> str:
     t = re.sub(r"\s+", " ", t or "").strip()
     t = re.sub(r"^หนังสือ\s+", "", t)
+    t = re.sub(r"\s+สำนักพิมพ์\s+.+$", "", t)
     return t
 
 

@@ -1,24 +1,70 @@
 {% extends "base.html" %}
 {% block body %}
-<h2 style="margin-top:0">เล่มเดียวกันที่ขายหลายร้าน (ผลจากการตัดรายการซ้ำข้ามแหล่ง)</h2>
-<p class="muted">จับคู่ด้วย ISBN ก่อน ถ้าไม่มีใช้ชื่อเรื่องที่ normalize แล้ว + fuzzy match · เรียงตามส่วนต่างราคามากสุด</p>
+<h2 style="margin-top:0">เทียบราคาเล่มเดียวกันข้ามร้าน</h2>
+<p class="muted">จับคู่ด้วย ISBN ก่อน ถ้าไม่มีใช้ชื่อเรื่องที่ normalize แล้ว + fuzzy match (เลขเล่มต้องตรงกัน) · <b style="color:var(--ok)">สีเขียว</b> = ร้านที่ถูกที่สุด</p>
+
+<div class="kpis">
+  <div class="kpi"><div class="l">เล่มที่ขาย ≥ 2 ร้าน</div><div class="v">{{ summary.in2 or 0 }}</div></div>
+  <div class="kpi"><div class="l">เล่มที่ขายครบ 3 ร้าน</div><div class="v">{{ summary.in3 or 0 }}</div></div>
+  <div class="kpi"><div class="l">ส่วนต่างราคาเฉลี่ย</div><div class="v">{{ summary.avg_save|baht }}</div></div>
+  <div class="kpi"><div class="l">ส่วนต่างสูงสุด</div><div class="v">{{ summary.max_save|baht }}</div></div>
+</div>
+
+<div class="grid2">
+  <div class="card"><h3>ร้านที่ถูกที่สุดบ่อยที่สุด (นับจำนวนเล่ม)</h3><canvas id="w" height="190"></canvas></div>
+  <div class="card"><h3>ราคาเฉลี่ยของ "เล่มเดียวกัน" แยกตามร้าน</h3><canvas id="a" height="190"></canvas></div>
+</div>
+
+<form class="filters" method="get" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px">
+  <label style="flex:1;min-width:260px">🔎 ค้นหาเทียบราคาด้วยชื่อเรื่อง / ผู้แต่ง
+    <input name="q" value="{{ f.q }}" placeholder="เช่น ฮิงาชิโนะ, ฆาตกรรม, โฮล์มส์" style="font-size:16px" autofocus>
+  </label>
+  <label>แสดง
+    <select name="n">
+      <option value="1" {{ 'selected' if f.n==1 }}>ทุกเล่มที่ตรงคำค้น</option>
+      <option value="2" {{ 'selected' if f.n==2 }}>ขายตั้งแต่ 2 ร้าน</option>
+      <option value="3" {{ 'selected' if f.n==3 }}>ขายครบ 3 ร้าน</option>
+    </select>
+  </label>
+  <button>ค้นหา</button>{% if f.q %} <a href="/compare">ล้าง</a>{% endif %}
+</form>
+{% if f.q %}<p class="muted">ผลการค้นหา "<b>{{ f.q }}</b>": {{ rows|length }} เล่ม · ช่อง — = ร้านนั้นไม่มีขาย</p>{% endif %}
+
 <div class="tbl">
 <table>
-  <thead><tr><th>ชื่อเรื่อง</th><th>จำนวนร้าน</th><th class="num">ถูกสุด</th><th class="num">แพงสุด</th><th class="num">ต่างกัน</th><th>ราคาแต่ละร้าน</th></tr></thead>
+  <thead><tr><th>ชื่อเรื่อง</th>
+    {% for s in srcs %}<th class="num"><span class="tag {{ s }}">{{ LABELS.get(s, s) }}</span></th>{% endfor %}
+    <th class="num">ส่วนต่าง</th><th>ถูกสุดที่</th></tr></thead>
   <tbody>
   {% for r in rows %}
   <tr>
     <td>{{ r.title }}{% if r.isbn %}<br><span class="muted">ISBN {{ r.isbn }}</span>{% endif %}</td>
-    <td>{{ r.n_sources }}</td>
-    <td class="num"><b>{{ r.min_price|baht }}</b></td>
-    <td class="num">{{ r.max_price|baht }}</td>
+    {% for s in srcs %}
+      {% set o = r.offers.get(s) %}
+      <td class="num">{% if o %}<a href="{{ o.url }}" target="_blank" rel="noopener"
+          style="{{ 'color:var(--ok);font-weight:700' if o.price|float == r.min_price|float else '' }}">{{ o.price|baht }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>
+    {% endfor %}
     <td class="num">{{ r.diff|baht }}</td>
-    <td>{% for o in r.offers %}<a href="{{ o.url }}" target="_blank" rel="noopener"><span class="tag {{ o.source }}">{{ LABELS.get(o.source, o.source) }} {{ o.price|baht }}</span></a> {% endfor %}</td>
+    <td><span class="tag {{ r.cheapest_source }}">{{ LABELS.get(r.cheapest_source, r.cheapest_source) }}</span></td>
   </tr>
   {% else %}
-  <tr><td colspan="6" class="muted">ยังไม่พบเล่มที่ซ้ำกันข้ามร้าน</td></tr>
+  <tr><td colspan="{{ srcs|length + 3 }}" class="muted">ยังไม่พบเล่มที่ซ้ำกันข้ามร้าน — Trigger DAG ก่อน</td></tr>
   {% endfor %}
   </tbody>
 </table>
 </div>
+
+<script>
+const labels = {{ LABELS|tojson }};
+const colors = {seed:'#c0504d', b2s:'#2f4b6e', amarin:'#4f8a3c', bookcaze:'#7b4d9a', naiin:'#c79a2c'};
+const wins = {{ wins|tojson }}, avg = {{ avg_same|tojson }};
+new Chart(document.getElementById('w'), {type:'bar',
+  data:{labels: wins.map(r => labels[r.source] || r.source),
+        datasets:[{label:'จำนวนเล่มที่ถูกที่สุด', data: wins.map(r => r.n), backgroundColor: wins.map(r => colors[r.source] || '#888')}]},
+  options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}});
+new Chart(document.getElementById('a'), {type:'bar',
+  data:{labels: avg.map(r => labels[r.source] || r.source),
+        datasets:[{label:'ราคาเฉลี่ย (บาท)', data: avg.map(r => Number(r.avg_price)), backgroundColor: avg.map(r => colors[r.source] || '#888')}]},
+  options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}});
+</script>
 {% endblock %}
