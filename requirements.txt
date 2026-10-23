@@ -1,0 +1,9 @@
+# Pipeline (installed into the Airflow image via airflow/requirements.txt)
+apache-airflow==2.10.5
+requests>=2.31
+beautifulsoup4>=4.12
+lxml>=5.0
+psycopg2-binary>=2.9
+# Web dashboard (web/requirements.txt)
+flask>=3.0
+gunicorn>=22.0

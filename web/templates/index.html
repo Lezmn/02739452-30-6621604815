@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block body %}
+<form class="filters" method="get">
+  <label>ค้นหาชื่อเรื่อง/ผู้แต่ง<input name="q" value="{{ f.q }}" placeholder="เช่น โฮล์มส์"></label>
+  {% for s in all_sources %}
+  <label class="chk"><input type="checkbox" name="source" value="{{ s }}" {{ 'checked' if s in f.source }}> {{ LABELS.get(s, s) }}</label>
+  {% endfor %}
+  <label>ราคาต่ำสุด<input type="number" name="min" value="{{ f.min if f.min is not none }}" style="width:100px"></label>
+  <label>ราคาสูงสุด<input type="number" name="max" value="{{ f.max if f.max is not none }}" style="width:100px"></label>
+  <label>เรียงตาม
+    <select name="sort">
+      {% for k,v in [('price_asc','ราคาน้อย→มาก'),('price_desc','ราคามาก→น้อย'),('discount','ส่วนลดมากสุด'),('title','ชื่อเรื่อง'),('new','อัปเดตล่าสุด')] %}
+      <option value="{{ k }}" {{ 'selected' if f.sort==k }}>{{ v }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="chk"><input type="checkbox" name="discount" value="1" {{ 'checked' if f.discount }}> มีส่วนลดเท่านั้น</label>
+  <button>กรอง</button> <a href="/">ล้างตัวกรอง</a>
+</form>
+
+<div class="kpis">
+  <div class="kpi"><div class="l">รายการทั้งหมด</div><div class="v">{{ kpi.n or 0 }}</div></div>
+  <div class="kpi"><div class="l">หนังสือไม่ซ้ำ (หลังตัดซ้ำ)</div><div class="v">{{ kpi.uniq or 0 }}</div></div>
+  <div class="kpi"><div class="l">ราคาเฉลี่ย</div><div class="v">{{ kpi.avg_price|baht }}</div></div>
+  <div class="kpi"><div class="l">ถูกสุด / แพงสุด</div><div class="v" style="font-size:20px">{{ kpi.min_price|baht }} / {{ kpi.max_price|baht }}</div></div>
+  <div class="kpi"><div class="l">ส่วนลดเฉลี่ย</div><div class="v">{{ kpi.avg_disc or 0 }}%</div></div>
+  <div class="kpi"><div class="l">เล่มที่ขายหลายร้าน</div><div class="v">{{ multi }}</div></div>
+</div>
+
+<div class="grid2">
+  <div class="card"><h3>ราคาเฉลี่ยและจำนวนเล่มแยกตามร้าน</h3><canvas id="c1" height="200"></canvas></div>
+  <div class="card"><h3>การกระจายราคา (ช่วงละ 100 บาท)</h3><canvas id="c2" height="200"></canvas></div>
+</div>
+
+<p class="muted">แสดง {{ rows|length }} รายการ{% if kpi.last_update %} · อัปเดตล่าสุด {{ kpi.last_update.strftime('%Y-%m-%d %H:%M') }} UTC{% endif %}</p>
+<div class="tbl">
+<table>
+  <thead><tr><th></th><th>ชื่อเรื่อง</th><th>ร้าน</th><th class="num">ราคา</th><th class="num">ราคาปก</th><th class="num">ลด</th><th>ISBN</th><th>มีกี่ร้าน</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr>
+    <td>{% if r.image_url %}<img src="{{ r.image_url }}" alt="" width="36" loading="lazy">{% endif %}</td>
+    <td><a href="{{ r.url }}" target="_blank" rel="noopener">{{ r.title }}</a>{% if r.author %}<br><span class="muted">{{ r.author }}</span>{% endif %}</td>
+    <td><span class="tag {{ r.source }}">{{ LABELS.get(r.source, r.source) }}</span></td>
+    <td class="num"><b>{{ r.price|baht }}</b></td>
+    <td class="num">{% if r.list_price %}<del>{{ r.list_price|baht }}</del>{% else %}-{% endif %}</td>
+    <td class="num">{{ r.discount_pct ~ '%' if r.discount_pct else '-' }}</td>
+    <td>{{ r.isbn or '-' }}</td>
+    <td>{{ r.n_sources or 1 }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="8" class="muted">ยังไม่มีข้อมูล — ให้ trigger DAG <code>mystery_books_pipeline</code> ใน Airflow ก่อน</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<script>
+const bySource = {{ by_source|tojson }};
+const labels = {{ LABELS|tojson }};
+const hist = {{ hist|tojson }};
+const colors = {seed:'#c0504d', b2s:'#2f4b6e', amarin:'#4f8a3c', naiin:'#c79a2c'};
+new Chart(document.getElementById('c1'), {
+  data: {
+    labels: bySource.map(r => labels[r.source] || r.source),
+    datasets: [
+      {type:'bar', label:'ราคาเฉลี่ย (บาท)', data: bySource.map(r => Number(r.avg_price)),
+       backgroundColor: bySource.map(r => colors[r.source] || '#888'), yAxisID:'y'},
+      {type:'line', label:'จำนวนเล่ม', data: bySource.map(r => r.n), borderColor:'#1d1b18', yAxisID:'y1'}
+    ]},
+  options: {scales: {y:{beginAtZero:true, title:{display:true,text:'บาท'}},
+                     y1:{beginAtZero:true, position:'right', grid:{drawOnChartArea:false}, title:{display:true,text:'เล่ม'}}}}
+});
+new Chart(document.getElementById('c2'), {
+  type:'bar',
+  data:{labels: hist.map(h => h.bucket >= 1000 ? '1000+' : h.bucket + '-' + (h.bucket+99)),
+        datasets:[{label:'จำนวนเล่ม', data: hist.map(h => h.n), backgroundColor:'#8a2b2b'}]},
+  options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}
+});
+</script>
+{% endblock %}

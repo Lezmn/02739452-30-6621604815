@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Mystery Book Prices{% endblock %}</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#f6f4ef;--card:#fff;--ink:#1d1b18;--muted:#6f6a61;--line:#e4dfd5;--accent:#8a2b2b;--accent2:#2f4b6e;--ok:#2e7d4f;--warn:#b7791f;--bad:#b42318}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans Thai",system-ui,sans-serif;font-size:15px}
+header{background:var(--ink);color:#fff;padding:14px 24px;display:flex;gap:24px;align-items:center;flex-wrap:wrap}
+header h1{font-size:18px;margin:0;font-weight:700}
+header h1 span{color:#e8b4a0}
+nav a{color:#ddd;text-decoration:none;margin-right:16px;font-weight:500}
+nav a.on,nav a:hover{color:#fff;border-bottom:2px solid #e8b4a0}
+main{max-width:1240px;margin:0 auto;padding:20px 16px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px}
+.kpi,.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.kpi .l{color:var(--muted);font-size:13px}.kpi .v{font-size:26px;font-weight:700;margin-top:4px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+@media(max-width:800px){.grid2{grid-template-columns:1fr}}
+.card h3{margin:0 0 10px;font-size:15px}
+form.filters{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:16px}
+form.filters label{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:4px}
+input,select{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:#fff}
+button{font:inherit;padding:8px 16px;border:0;border-radius:7px;background:var(--accent);color:#fff;cursor:pointer}
+.chk{flex-direction:row!important;align-items:center;gap:6px!important;color:var(--ink)!important;font-size:14px!important}
+table{width:100%;border-collapse:collapse;background:#fff;font-size:14px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:#efebe3;font-weight:600;position:sticky;top:0}
+td.num{text-align:right;white-space:nowrap}
+.tbl{overflow:auto;max-height:640px;border:1px solid var(--line);border-radius:10px}
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;background:#efebe3}
+.tag.seed{background:#fde2e1}.tag.b2s{background:#dbe8f7}.tag.amarin{background:#e3f1df}.tag.naiin{background:#f6ecd2}
+.st{font-weight:600}.st.success{color:var(--ok)}.st.partial{color:var(--warn)}.st.quality_failed,.st.failed{color:var(--bad)}.st.running{color:var(--accent2)}
+a{color:var(--accent2)}
+.muted{color:var(--muted)}
+del{color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <h1>🔎 <span>Mystery</span> Book Prices · ราคานิยายสืบสวนจากร้านหนังสือไทย</h1>
+  <nav>
+    <a href="/" class="{{ 'on' if request.path=='/' }}">Dashboard</a>
+    <a href="/compare" class="{{ 'on' if request.path=='/compare' }}">เทียบราคาข้ามร้าน</a>
+    <a href="/status" class="{{ 'on' if request.path=='/status' }}">Pipeline status</a>
+  </nav>
+</header>
+<main>{% block body %}{% endblock %}</main>
+</body>
+</html>
